@@ -1,3 +1,4 @@
+//ASSIGNMENT 3
 // Constants
 const int TEMP_PIN = A0; // temperature sensor analog input
 const int BLUE_LED = 8; // blue LED
