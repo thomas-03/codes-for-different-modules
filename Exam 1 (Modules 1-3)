@@ -1,0 +1,92 @@
+// Constants
+const int TEMP_PIN = A0; // temperature sensor analog input
+const int BLUE_LED = 8; // blue LED
+const int FILTER_COUNTS = 5; // length of array for rolling average calculations
+const long oneSec = 250; // four executions per second = one execution per 250 ms
+const long blinkDuration = 200; // how long the LED stays on
+
+// Floats
+float temp = (analogRead(TEMP_PIN) * 1.1 / 1023) * 100 - 50; //calculates temperature from raw numbers temp sensor gives 
+float average = 0;
+float sum = 0;
+float temperatures[FILTER_COUNTS] = {0, 0 ,0 ,0 ,0}; //stores 5 most recent temperatures so you can find the average 
+//need the numbers in temperatures[] all set to 0 @ first so doesn't work incorrectly when have <5 values at first
+
+// Longs
+long timer = oneSec;
+long blinkTime = blinkDuration; // the value you will compare via delta timing
+long cricketTime = (60000 / (7 * (average - 10) + 40)); // how many ms per chirp
+long cricketTimer = cricketTime; // how long you must wait in total for a single chirp
+long difference = cricketTime - blinkTime; // the time the LED stays off
+
+//Integers
+int count = 0;
+int iniDelay = 1500;
+
+// Booleans
+boolean cricketOn = true;
+
+// (Vmeasured * 100 C/V) - 50 C = temperature (degrees Celsius)
+// Overall equation = [(Output number * 1.1 V) / 1023]  * 100 C/V - 50 C = temp
+
+void setup() {
+  Serial.begin(9600); //Serial.begin() establishes connection betweeen arduino and diff device by establishing serial protocol of how to interpret info from each other
+	//9600 represents the baud rate (# of bits that can be transferred per second)
+  pinMode(BLUE_LED, OUTPUT); //establishes a pin on the arduino board and whatever it is connected to as output
+  pinMode(TEMP_PIN, INPUT); //establishes a pin on the arduino board and whatever it is connected to as input
+  analogReference(INTERNAL); //used to set the voltage recieved by TEMP_PIN to be within range of 0 to 1.1V
+	//inputs usually send voltage (either between 0 - 1.1V or 0 - 5V), voltage corresponds with a number between 0 and 1023 (0V = 0, 1023 = 1.1 or 5V)
+  digitalWrite(BLUE_LED, LOW); //makes blue light initially off
+}
+
+void loop() {
+  // Delta timing of reading temperature
+  if(millis() >= timer) //makes it so that every second you get the temperature and the average of past 5 temps
+  {
+    temp = (analogRead(TEMP_PIN) * 1.1 / 1023) * 100 - 50;
+    Serial.print(temp);
+    Serial.print(", ");
+    Serial.println(average);
+    readTemp();
+    timer = millis() + oneSec;
+		//^ makes it so code inside brackets will happen again after one sec passes
+  }
+	
+	
+  if(!cricketOn) // if the LED is off, you must wait BLINK_DURATION before turning on
+  {
+	
+    if(millis() >= difference)  {
+      cricketOn = true;
+      cricketTime = (60000 / (7 * (average - 10) + 40)); //lines 61-63 all update timers
+      cricketTimer = millis() + cricketTime;
+      blinkTime = millis() + blinkDuration;
+    }
+		
+  } else if(cricketOn)		{
+	
+    digitalWrite(BLUE_LED, HIGH); //sets the light on 
+    if(millis() >= blinkTime && millis() >= iniDelay)  { //checks if at least 1500ms has passed and if the blinkTime has passed
+   
+	 		digitalWrite(BLUE_LED,LOW); //turns off LED
+      cricketOn = false; //sets cricketOn to false so above part will happen after finish this group of code
+      cricketTime = (60000 / (7 * (average - 10) + 40)); //lines 70-72 all update timers
+      cricketTimer = millis() + cricketTime; 
+      blinkTime = millis() + blinkDuration; 
+      difference = cricketTimer - blinkTime + millis(); //ms/chirp - how long LED stays on + current time = how long LED needs to stay off
+    }
+		
+  }
+	
+}
+
+// Calculate the rolling-average
+void readTemp() {
+  temperatures[(count % FILTER_COUNTS)] = temp;
+  count += 1;
+  for (int i = 0; i < FILTER_COUNTS; i++){
+    sum += temperatures[i];
+  }
+  average = sum / FILTER_COUNTS;
+  sum = 0;
+}
