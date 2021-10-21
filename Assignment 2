@@ -1,0 +1,92 @@
+//Fill in the values below with the pins that you chose to use
+const int POT_PIN = A0; // analog input
+const int BUTTON_PIN = 11;
+const int HOT_PIN = 10;
+const int COLD_PIN = 9;
+const int DRY_PIN = 8;
+const int LOCK_PIN = 13;
+
+enum State{
+  off, //0
+  cold,//1
+  hot, //2
+  medium, //3
+  dryerOn //4
+};
+
+State washerState = off;
+int buttonState = 1; // you start by not pressing the button, PULL_UP makes the default 1 and 0 when pressed
+int potState = 0; // initial value of the potentiometer reading
+
+void setup() {
+pinMode(BUTTON_PIN, INPUT_PULLUP);
+pinMode(HOT_PIN, OUTPUT);
+pinMode(COLD_PIN, OUTPUT);
+pinMode(DRY_PIN, OUTPUT);
+pinMode(LOCK_PIN, OUTPUT);
+Serial.begin(9600);
+}
+
+void loop() {
+buttonState = digitalRead(BUTTON_PIN);
+potState = analogRead(POT_PIN);
+if (buttonState == 0 && washerState == off){
+  washerState = nextState(washerState);
+}
+if (washerState != off)
+  washerState = nextState(washerState);
+}
+
+State nextState(State washerState){
+ switch(washerState){
+  case off:
+    // all lights off & if button pressed (result 0) then switch depending on pot
+    if (potState <= 300)
+      washerState = cold;
+    else
+      washerState = hot;
+    digitalWrite(HOT_PIN, LOW);
+    digitalWrite(COLD_PIN, LOW);
+    digitalWrite(DRY_PIN, LOW);
+    digitalWrite(LOCK_PIN, HIGH);
+    break;
+  case cold:
+    //green light on & delay for 5 minutes then switch to dryer
+    digitalWrite(COLD_PIN, HIGH);
+    delay(5000);
+    digitalWrite(COLD_PIN, LOW);
+    washerState = dryerOn;
+    break;
+  case hot:
+    // red light on & delay for 7 minutes then switch to dryer
+    digitalWrite(HOT_PIN, HIGH);
+    delay(7000);
+    if (potState <= 600){
+      digitalWrite(HOT_PIN, LOW);
+      washerState = dryerOn;  
+    } else {
+      washerState = medium;
+    }
+    break;
+  case medium:
+    digitalWrite(COLD_PIN, HIGH);
+    delay(7000);
+    digitalWrite(HOT_PIN, LOW);
+    digitalWrite(COLD_PIN, LOW);
+    washerState = dryerOn;
+    break;
+    // red light & green light on and delay for 7 minutes then switch to dryer
+  case dryerOn:
+    // yellow light on & check if statement for pot and then delay accordingly
+    digitalWrite(DRY_PIN, HIGH);
+    if(potState <= 300)
+      delay(2000);
+    else
+      delay(7000);
+    digitalWrite(DRY_PIN, LOW);
+    digitalWrite(LOCK_PIN, LOW);
+    washerState = off;
+    break;
+ }
+ return washerState; 
+}
